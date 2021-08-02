@@ -1,0 +1,1 @@
+<html><body>You are being <a href="https://raw.githubusercontent.com/input-output-hk/plutus-starter/main/pab/Main.hs">redirected</a>.</body></html>

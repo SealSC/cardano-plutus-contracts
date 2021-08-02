@@ -1,0 +1,28 @@
+{
+    "name": "Cardano Pluts Contracts",
+    "image": "docker.io/inputoutput/plutus-starter-devcontainer:v1.0.6",
+
+    "remoteUser": "plutus",
+    "workspaceFolder": "/workspaces/seal-swap",
+
+    "mounts": [
+        // Cache for cabal
+        "source=${localEnv:HOME}/.cabal/packages,target=/home/plutus/.cabal/packages,type=bind,consistency=cached",
+        // Cache for vs-codeserver, you can precreate this folder to skip install vscode-server phase in cointainer starting.
+        "source=${localEnv:HOME}/.plutus-dev-container/vscode-server,target=/home/plutus/.vscode-server,type=bind,consistency=cached"
+    ],
+
+    "settings": {
+        // Note: don't change from bash so it runs .bashrc
+        "terminal.integrated.profiles.linux": {
+            "bash": {
+                "path": "/bin/bash",
+            }
+        }
+    },
+        
+    // IDs of extensions inside container
+    "extensions": [
+        "haskell.haskell"
+    ],
+}
