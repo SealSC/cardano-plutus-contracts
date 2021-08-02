@@ -1,0 +1,28 @@
+version: '3.6'
+services:
+  server:
+    image: plutus-playground
+    ports:
+      - '8080:8080'
+    command:
+      - /root/.nix-profile/bin/nix-shell
+      - --run
+      - |
+        cd plutus-playground-client && plutus-playground-server
+    volumes:
+      - "/nix:/nix"
+  client:
+    image: plutus-playground
+    command:
+      - /root/.nix-profile/bin/nix-shell
+      - --run
+      - |
+        cd plutus-playground-client && npm run startO
+    depends_on:
+      - server
+    ports:
+      - '8009:8009'
+    volumes:
+      - "/nix:/nix"
+    links:
+      - server

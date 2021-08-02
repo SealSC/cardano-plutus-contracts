@@ -1,6 +1,6 @@
-# ada-demo
+# Cardano Plutus Contracts
 
-Here is a DApp demo for ada/PLUTUS. 
+Here is a contracts on Cardano Plutus for swapping seal with ada. 
 
 ## Setup Playground
 
@@ -16,6 +16,7 @@ docker-compose up
 
 Wait a while, then open <https://localhost:8009/> in your favorite browser.
 
+
 ## Simulation
 
 Copy the content of `src/swapToken.hs` to play ground. Click "Compile" then "Simulate" button.
@@ -27,7 +28,8 @@ Copy the content of `src/swapToken.hs` to play ground. Click "Compile" then "Sim
 User can exchange token "Seal" with "Lovelace".
 > This is not fully complated
 
-*TOOD*
+## TOOD
+
 - [ ] Off-Chain
   - [x] Send Seal
   - [x] Send Lovelace
@@ -38,8 +40,10 @@ User can exchange token "Seal" with "Lovelace".
   - [x] Declare Loveace
   - [ ] Exchange Pool
   - [ ] Validator
+- [ ] Upgrade to latest plutus (v1.0.6)
 
 
 ## Referenece
 
 - https://github.com/input-output-hk/plutus/blob/master/README.adoc
+

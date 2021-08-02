@@ -1,0 +1,3 @@
+[submodule "playground/plutus"]
+	path = playground/plutus
+	url = https://github.com/input-output-hk/plutus
