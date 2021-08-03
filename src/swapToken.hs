@@ -1,4 +1,19 @@
+{-# LANGUAGE DataKinds                  #-}
+{-# LANGUAGE DeriveAnyClass             #-}
+{-# LANGUAGE DeriveGeneric              #-}
+{-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase                 #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
+{-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
+{-# LANGUAGE TypeFamilies               #-}
+{-# LANGUAGE TypeOperators              #-}
 
 import           Control.Monad        hiding (fmap)
 import           Data.Aeson           (ToJSON, FromJSON)
@@ -24,94 +39,102 @@ import           Prelude              (Semigroup (..))
 import           Schema               (ToSchema)
 import           Text.Printf          (printf)
 
-data SwapDatum = SwapDatum
+-- | Define Token
+tokenSeal :: KnownCurrency
+tokenSeal = KnownCurrency (ValidatorHash "seal") "Token" (TokenName "Seal" :| [])
+$(mkKnownCurrencies ['tokenSeal])
+
+-- | Contract Code
+
+-- Data
+data SealSwapDatum = SealSwapDatum
     { sRecipient   :: !PubKeyHash
     , sAmount   :: !Integer
     } deriving Show
 
-PlutusTx.unstableMakeIsData ''SwapDatum
+PlutusTx.unstableMakeIsData ''SealSwapDatum
+PlutusTx.makeLift ''SealSwapDatum
 
-data Swapping
-instance Scripts.ScriptType Swapping where
-    type instance DatumType Swapping = SwapDatum
-    type instance RedeemerType Swapping = ()
+data SealSwap
+instance Scripts.ScriptType SealSwap where
+    type instance DatumType SealSwap = SealSwapDatum
+    type instance RedeemerType SealSwap = ()
 
-{-# INLINABLE mkValidator #-}
-mkValidator :: SwapDatum -> () -> ValidatorCtx -> Bool
-mkValidator sd _ _ = sAmount sd == 1
+{-# INLINABLE mkSealSwapValidator #-}
+mkSealSwapValidator :: SealSwapDatum -> () -> ValidatorCtx -> Bool
+mkSealSwapValidator sd _ _ = sAmount sd == 1
 
-swappingInstance :: Scripts.ScriptInstance Swapping
-swappingInstance = Scripts.validator @Swapping
-        $$(PlutusTx.compile [|| mkValidator ||])
+sealSwapInstance :: Scripts.ScriptInstance SealSwap
+sealSwapInstance = Scripts.validator @SealSwap
+        $$(PlutusTx.compile [|| mkSealSwapValidator ||])
         $$(PlutusTx.compile [|| wrap ||])
     where
-        wrap = Scripts.wrapValidator @SwapDatum @()
+        wrap = Scripts.wrapValidator @SealSwapDatum @()
 
-validator :: Validator
-validator = Scripts.validatorScript swappingInstance
+sealSwapValidator :: Validator
+sealSwapValidator = Scripts.validatorScript sealSwapInstance
 
-valHash :: Ledger.ValidatorHash
-valHash = Scripts.validatorHash validator
+sealSwapValidatorHash :: Ledger.ValidatorHash
+sealSwapValidatorHash = Scripts.validatorHash sealSwapValidator
 
 scrAddress :: Ledger.Address
-scrAddress = scriptAddress validator
+scrAddress = scriptAddress sealSwapValidator
 
-data BuyParms = BuyParms
-    { bpAmount      :: !Integer
-    , bpBid         :: !Integer
-    } deriving (Generic, ToJSON, FromJSON, ToSchema)
-
-data SellParams = SellParams
+-- | Wallet Code
+-- Sell
+data SealSellParams = SealSellParams
     { spAmount  :: !Integer
     , spBid     :: !Integer
     } deriving (Generic, ToJSON, FromJSON, ToSchema)
 
-type SealExchangeSchema = 
-    BlockchainActions
-        .\/ Endpoint "buy" BuyParms
-        .\/ Endpoint "sell" SellParams
-
-buy :: (HasBlockchainActions s, AsContractError e) => BuyParms -> Contract w s e ()
-buy BuyParms{..} = do
+sealSell :: (HasBlockchainActions s, AsContractError e) => SealSellParams -> Contract w s e ()
+sealSell SealSellParams{..} = do
     pkh <- pubKeyHash <$> ownPubKey
-    utxos <- Map.filter f <$> utxoAt (ScriptAddress valHash)
+    let s = SealSwapDatum
+                { sRecipient =  pkh
+                , sAmount    =  spBid}
+        v = Value.singleton "7365616c" "Seal" spAmount
+    let tx = mustPayToTheScript s v
+    ledgerTx <- submitTxConstraints sealSwapInstance tx
+    void $ awaitTxConfirmed $ txId ledgerTx
+    logInfo @String $ printf "sealSell %d seal for %d lovelace" spAmount 
+
+-- Buy
+data SealBuyParms = SealBuyParms
+    { bpAmount      :: !Integer
+    , bpBid         :: !Integer
+    } deriving (Generic, ToJSON, FromJSON, ToSchema)
+
+
+sealBuy :: (HasBlockchainActions s, AsContractError e) => SealBuyParms -> Contract w s e ()
+sealBuy SealBuyParms{..} = do
+    pkh <- pubKeyHash <$> ownPubKey
+    utxos <- Map.filter f <$> utxoAt (ScriptAddress sealSwapValidatorHash)
     logInfo @String $ printf "%s" $ show utxos
     logInfo @String $ printf "bid %d lovelare for %d seal" bpBid bpAmount
-    let s = SwapDatum
+    let s = SealSwapDatum
                 { sRecipient =  pkh
                 , sAmount    =  bpAmount}
         v = Ada.lovelaceValueOf bpBid
     let tx = mustPayToTheScript s v
-    ledgerTx <- submitTxConstraints swappingInstance tx
+    ledgerTx <- submitTxConstraints sealSwapInstance tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "bid %d lovelare for %d seal" bpBid bpAmount
    where
     f :: TxOutTx -> Bool
     f o = True
 
-sell :: (HasBlockchainActions s, AsContractError e) => SellParams -> Contract w s e ()
-sell SellParams{..} = do
-    pkh <- pubKeyHash <$> ownPubKey
-    let s = SwapDatum
-                { sRecipient =  pkh
-                , sAmount    =  spBid}
-        v = Value.singleton "7365616c" "Seal" spAmount
-    let tx = mustPayToTheScript s v
-    ledgerTx <- submitTxConstraints swappingInstance tx
-    void $ awaitTxConfirmed $ txId ledgerTx
-    logInfo @String $ printf "sell %d seal for %d lovelace" spAmount 
-
-endpoints :: Contract () SealExchangeSchema Text ()
-endpoints = (buy' `select` sell') >> endpoints
-  where
-    buy' = endpoint @"buy" >>= buy
-    sell'   = endpoint @"sell"   >>= sell 
+-- wallet binding
+type SealExchangeSchema = 
+    BlockchainActions
+        .\/ Endpoint "sealBuy" SealBuyParms
+        .\/ Endpoint "sealSell" SealSellParams
 
 mkSchemaDefinitions ''SealExchangeSchema
-
-tokenSeal :: KnownCurrency
-tokenSeal = KnownCurrency (ValidatorHash "seal") "Token" (TokenName "Seal" :| [])
-
 mkSchemaDefinitions ''BlockchainActions
 
-$(mkKnownCurrencies ['tokenSeal])
+endpoints :: Contract () SealExchangeSchema Text ()
+endpoints = (sealBuy' `select` sealSell') >> endpoints
+  where
+    sealSell'   = endpoint @"sealSell"   >>= sealSell 
+    sealBuy' = endpoint @"sealBuy" >>= sealBuy

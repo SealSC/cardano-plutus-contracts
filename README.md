@@ -16,6 +16,15 @@ docker-compose up
 
 Wait a while, then open <https://localhost:8009/> in your favorite browser.
 
+## Build & Test
+
+Open in devcontainer in VSCode. Run in terminal:
+
+```
+cabal build
+```
+
+> devcontainer config: .devcontainer/devcontainer.json
 
 ## Simulation
 
