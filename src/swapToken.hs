@@ -31,7 +31,7 @@ import           Ledger.Constraints   as Constraints
 import qualified Ledger.Scripts       as Scripts
 import qualified Ledger.Typed.Scripts as Scripts
 import           Ledger.Value         as Value
-import           Ledger.Ada           as Ada
+import           Ledger.Ada           (lovelaceValueOf)
 import           Playground.Contract  (ensureKnownCurrencies, printSchemas, stage, printJson)
 import           Playground.TH        (mkKnownCurrencies, mkSchemaDefinitions)
 import           Playground.Types     (KnownCurrency (..))
@@ -40,9 +40,28 @@ import           Schema               (ToSchema)
 import           Text.Printf          (printf)
 
 -- | Define Token
+{-# INLINABLE sealSymbol #-}
+-- | The 'CurrencySymbol' of the 'Seal' currency.
+sealSymbol :: CurrencySymbol
+sealSymbol = Value.currencySymbol "Seal"
+
+{-# INLINABLE sealToken #-}
+-- | The 'TokenName' of the 'Seal' currency.
+sealToken :: TokenName
+sealToken = Value.tokenName "Seal" 
+
+{-# INLINABLE sealValueOf #-}
+-- | A 'Value' with the given amount of Seal (the currency unit).
+sealValueOf :: Integer -> Value
+sealValueOf = Value.singleton sealSymbol sealToken
+
+
 tokenSeal :: KnownCurrency
-tokenSeal = KnownCurrency (ValidatorHash "seal") "Token" (TokenName "Seal" :| [])
-$(mkKnownCurrencies ['tokenSeal])
+tokenSeal = KnownCurrency
+    { hash = Ledger.fromSymbol sealSymbol
+    , friendlyName = "Seal"
+    , knownTokens = sealToken :| []
+    }
 
 -- | Contract Code
 
@@ -93,8 +112,7 @@ sealSell SealSellParams{..} = do
     let s = SealSwapDatum
                 { sRecipient =  pkh
                 , sAmount    =  spBid}
-        v = Value.singleton "7365616c" "Seal" spAmount
-    let tx = mustPayToTheScript s v
+    let tx = mustPayToTheScript s $ sealValueOf spAmount
     ledgerTx <- submitTxConstraints sealSwapInstance tx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo @String $ printf "sealSell %d seal for %d lovelace" spAmount 
@@ -115,7 +133,7 @@ sealBuy SealBuyParms{..} = do
     let s = SealSwapDatum
                 { sRecipient =  pkh
                 , sAmount    =  bpAmount}
-        v = Ada.lovelaceValueOf bpBid
+        v = lovelaceValueOf bpBid
     let tx = mustPayToTheScript s v
     ledgerTx <- submitTxConstraints sealSwapInstance tx
     void $ awaitTxConfirmed $ txId ledgerTx
@@ -138,3 +156,5 @@ endpoints = (sealBuy' `select` sealSell') >> endpoints
   where
     sealSell'   = endpoint @"sealSell"   >>= sealSell 
     sealBuy' = endpoint @"sealBuy" >>= sealBuy
+
+$(mkKnownCurrencies ['tokenSeal])
