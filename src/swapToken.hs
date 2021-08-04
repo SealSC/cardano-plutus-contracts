@@ -67,8 +67,8 @@ tokenSeal = KnownCurrency
 
 -- Data
 data SealSwapDatum = SealSwapDatum
-    { sRecipient   :: !PubKeyHash
-    , sAmount   :: !Integer
+    { sRecipient      :: !PubKeyHash
+    , sAmount         :: !Integer
     } deriving Show
 
 PlutusTx.unstableMakeIsData ''SealSwapDatum
@@ -109,70 +109,70 @@ sealSwapScriptAddress = scriptAddress sealSwapValidator
 -- | Wallet Code
 -- Sell
 data SealSellParams = SealSellParams
-    { spAmount  :: !Integer
-    , spBid     :: !Integer
+    { sspSealTokenAmount    :: !Integer
+    , sspSwapLoveaceAmount  :: !Integer
     } deriving (Generic, ToJSON, FromJSON, ToSchema)
 
 sealSell :: (HasBlockchainActions s, AsContractError e) => SealSellParams -> Contract w s e ()
 sealSell SealSellParams{..} = do
     pkh <- pubKeyHash <$> ownPubKey
     let s = SealSwapDatum
-                { sRecipient =  pkh
-                , sAmount    =  spBid}
-    let tx = mustPayToTheScript s $ sealValueOf spAmount
+                { sRecipient      = pkh
+                , sAmount         =  sspSwapLoveaceAmount}
+    let tx = mustPayToTheScript s $ sealValueOf sspSealTokenAmount
     ledgerTx <- submitTxConstraints sealSwapInstance tx
     void $ awaitTxConfirmed $ txId ledgerTx
-    logInfo @String $ printf "sealSell %d seal for %d lovelace" spAmount spBid
+    logInfo @String $ printf "sealSell %d seal for %d lovelace" sspSealTokenAmount sspSwapLoveaceAmount
 
 -- Buy
 data SealBuyParms = SealBuyParms
-    { bpAmount      :: !Integer
-    , bpBid         :: !Integer
+    { sbpBuySealTokenAmount  :: !Integer
+    , sbpCostLovelareAmount :: !Integer
     } deriving (Generic, ToJSON, FromJSON, ToSchema)
 
 
 sealBuy :: forall w s. HasBlockchainActions s => SealBuyParms -> Contract w s Text ()
 sealBuy SealBuyParms{..} = do
-    (oref, o, d) <- findUtxo sealSymbol sealToken bpAmount
+    (oref, o, d) <- findUtxo sealSymbol sealToken sbpBuySealTokenAmount sbpCostLovelareAmount
     logInfo @String $ printf "found seal swap utxo with datum %s" (show d)
 
     pkh <- pubKeyHash <$> ownPubKey
-    logInfo @String $ printf "bid %d lovelare for %d seal" bpBid bpAmount
-    let v  = sealValueOf bpAmount <> lovelaceValueOf bpBid
-        d' = d
+    let minLoveareAmount = min sbpCostLovelareAmount $ sAmount d
+    let v  = sealValueOf sbpBuySealTokenAmount <> lovelaceValueOf minLoveareAmount
         r  = Redeemer $ PlutusTx.toData BuyAction
         lookups = Constraints.scriptInstanceLookups sealSwapInstance
                <> Constraints.otherScript sealSwapValidator 
                <> Constraints.unspentOutputs (Map.singleton oref o)
-        tx = mustPayToTheScript d' v
-          <> mustPayToPubKey (sRecipient d) (lovelaceValueOf bpBid)
+        tx = mustPayToPubKey pkh v
+          <> mustPayToPubKey (sRecipient d) (lovelaceValueOf minLoveareAmount)
           <> mustSpendScriptOutput oref r
     ledgerTx <- submitTxConstraintsWith lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
-    logInfo @String $ printf "bid %d lovelare for %d seal" bpBid bpAmount
-
-findUtxo :: HasBlockchainActions s
-         => CurrencySymbol
-         -> TokenName
-         -> Integer
-         -> Contract w s Text (TxOutRef, TxOutTx, SealSwapDatum)
-findUtxo cs tn amount = do
-    utxos <- utxoAt sealSwapScriptAddress
-    let xs = [ (oref, o)
-             | (oref, o) <- Map.toList utxos
-             , Value.valueOf (txOutValue $ txOutTxOut o) cs tn == amount
-             ]
-    case xs of
-        [(oref, o)] -> case txOutType $ txOutTxOut o of
-            PayToPubKey   -> throwError "unexpected out type"
-            PayToScript h -> case Map.lookup h $ txData $ txOutTxTx o of
-                Nothing        -> throwError "datum not found"
-                Just (Datum e) -> case PlutusTx.fromData e of
-                    Nothing -> throwError "datum has wrong type"
-                    Just d@SealSwapDatum{..}
-                        | sAmount > 0 -> return (oref, o, d)
-                        | otherwise   -> throwError "seal swap token invalid"
-        _           -> throwError "seal swap utxo not found"
+    logInfo @String $ printf "bid %d lovelare for %d seal" minLoveareAmount sbpBuySealTokenAmount
+  where 
+    findUtxo :: HasBlockchainActions s
+             => CurrencySymbol
+             -> TokenName
+             -> Integer
+             -> Integer
+             -> Contract w s Text (TxOutRef, TxOutTx, SealSwapDatum)
+    findUtxo cs tn sealAmount lovelaceAmount= do
+        utxos <- utxoAt sealSwapScriptAddress
+        let xs = [ (oref, o)
+                 | (oref, o) <- Map.toList utxos
+                 , Value.valueOf (txOutValue $ txOutTxOut o) cs tn == sealAmount
+                 ]
+        case xs of
+            [(oref, o)] -> case txOutType $ txOutTxOut o of
+                PayToPubKey   -> throwError "unexpected out type"
+                PayToScript h -> case Map.lookup h $ txData $ txOutTxTx o of
+                    Nothing        -> throwError "datum not found"
+                    Just (Datum e) -> case PlutusTx.fromData e of
+                        Nothing -> throwError "datum has wrong type"
+                        Just d@SealSwapDatum{..}
+                            | (max sAmount lovelaceAmount) == lovelaceAmount -> return (oref, o, d)
+                            | otherwise   -> throwError "seal swap token invalid"
+            _           -> throwError "seal swap utxo not found"
 
 -- wallet binding
 type SealExchangeSchema = 
