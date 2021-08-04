@@ -88,7 +88,26 @@ instance Scripts.ScriptType SealSwapping where
 {-# INLINABLE mkSealSwapValidator #-}
 mkSealSwapValidator :: SealSwapDatum -> SealSwapAction -> ValidatorCtx -> Bool
 mkSealSwapValidator sd redeemer ctx =
-    trace "mkSealSwapValidator" True
+    case redeemer of
+        BuyAction ->
+            traceIfFalse "insufficient payment" checkPayment
+
+  where
+    info :: TxInfo
+    info = valCtxTxInfo ctx
+
+    getsValue :: PubKeyHash -> Value -> Bool
+    getsValue h v =
+      let
+        [o] = [ o'
+              | o' <- txInfoOutputs info
+              , txOutValue o' == v
+              ]
+      in
+        txOutAddress o == PubKeyAddress h
+
+    checkPayment :: Bool
+    checkPayment = getsValue (sRecipient sd) $ lovelaceValueOf $ sAmount sd
 
 sealSwapInstance :: Scripts.ScriptInstance SealSwapping
 sealSwapInstance = Scripts.validator @SealSwapping
