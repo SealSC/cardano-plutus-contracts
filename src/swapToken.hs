@@ -74,21 +74,28 @@ data SealSwapDatum = SealSwapDatum
 PlutusTx.unstableMakeIsData ''SealSwapDatum
 PlutusTx.makeLift ''SealSwapDatum
 
-data SealSwap
-instance Scripts.ScriptType SealSwap where
-    type instance DatumType SealSwap = SealSwapDatum
-    type instance RedeemerType SealSwap = ()
+data SealSwapAction = BuyAction | CloseAction
+    deriving Show
+
+PlutusTx.unstableMakeIsData ''SealSwapAction
+PlutusTx.makeLift ''SealSwapAction
+
+data SealSwapping
+instance Scripts.ScriptType SealSwapping where
+    type instance DatumType SealSwapping = SealSwapDatum
+    type instance RedeemerType SealSwapping = SealSwapAction
 
 {-# INLINABLE mkSealSwapValidator #-}
-mkSealSwapValidator :: SealSwapDatum -> () -> ValidatorCtx -> Bool
-mkSealSwapValidator sd _ _ = sAmount sd == 1
+mkSealSwapValidator :: SealSwapDatum -> SealSwapAction -> ValidatorCtx -> Bool
+mkSealSwapValidator sd redeemer ctx =
+    trace "mkSealSwapValidator" True
 
-sealSwapInstance :: Scripts.ScriptInstance SealSwap
-sealSwapInstance = Scripts.validator @SealSwap
+sealSwapInstance :: Scripts.ScriptInstance SealSwapping
+sealSwapInstance = Scripts.validator @SealSwapping
         $$(PlutusTx.compile [|| mkSealSwapValidator ||])
         $$(PlutusTx.compile [|| wrap ||])
     where
-        wrap = Scripts.wrapValidator @SealSwapDatum @()
+        wrap = Scripts.wrapValidator @SealSwapDatum @SealSwapAction
 
 sealSwapValidator :: Validator
 sealSwapValidator = Scripts.validatorScript sealSwapInstance
