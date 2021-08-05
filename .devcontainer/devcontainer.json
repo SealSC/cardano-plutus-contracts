@@ -3,7 +3,7 @@
     "image": "docker.io/inputoutput/plutus-starter-devcontainer:v1.0.6",
 
     "remoteUser": "plutus",
-    "workspaceFolder": "/workspaces/seal-swap",
+    "workspaceFolder": "/workspaces/cardano-plutus-contracts",
 
     "mounts": [
         // Cache for cabal

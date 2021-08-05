@@ -26,29 +26,44 @@ cabal build
 
 > devcontainer config: .devcontainer/devcontainer.json
 
-## Simulation
 
-Copy the content of `src/swapToken.hs` to play ground. Click "Compile" then "Simulate" button.
 
 ## Contracts
 
 ### Swap Token
 
-User can exchange token "Seal" with "Lovelace".
-> This is not fully complated
+User can exchange token "Seal" with "Lovelace". This is a simple demo.
+
+### Simulation
+
+Copy the content of `src/swapToken.hs` to play ground. Click "Compile" then "Simulate" button.
+
+### Scenario 1
+
+Wallet 1 want to sell 10 seal for 20 lovelace.
+Wallet 2 want to buy 10 seal.
+
+
+Set up the simuation as below, then click `Evaluate`.
+
+![](./img/scenario-01-simulation-setup.png)
+
+Then you can see after last transation, wallet 1 got 20 lovelace and wallet 2 got 10 seal.
+
+![](img/seenario-01-result.png)
 
 ## TOOD
 
-- [ ] Off-Chain
+- [x] Off-Chain
   - [x] Send Seal
   - [x] Send Lovelace
-  - [ ] Reeder Seal
-  - [ ] Reeder Lovelace
-- [ ] On-Chain
+  - [x] Reeder Seal
+  - [x] Reeder Lovelace
+- [x] On-Chain
   - [x] Declare Seal
   - [x] Declare Loveace
-  - [ ] Exchange Pool
-  - [ ] Validator
+  - [x] Exchange Pool
+  - [x] Validator (only check payment)
 - [ ] Upgrade to latest plutus (v1.0.6)
 
 
